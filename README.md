@@ -133,7 +133,7 @@ log_dir: "experiment_logs"
 ### Divide-and-Conquer Configuration (`configs/divide_conquer_config.yaml`)
 
 ```yaml
-model: "improved_divide_conquer"
+model: "divide_and_conquer"
 llm_path: "Qwen/Qwen3-8B"
 max_new_tokens: 32768
 few_shot: 0  # Disabled to avoid interference
@@ -164,7 +164,7 @@ Key features:
 
 ### Divide-and-Conquer Implementation
 
-Located in `models/improved_divide_conquer_model.py`:
+Located in `models/divide_and_conquer_model.py`:
 
 - **Temporal Slicing**: 8 decade-based categories (1950s-2020s)
 - **Geographic Slicing**: 9 nationality categories + "other"
