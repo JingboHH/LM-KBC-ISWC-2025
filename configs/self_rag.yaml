@@ -1,0 +1,28 @@
+# configs/self_rag_config.yaml
+# Configuration for Self-RAG model (general relations)
+
+model: "self_rag"
+llm_path: "Qwen/Qwen3-8B"
+prompt_templates_file: "prompt_templates/question_prompts.csv"
+
+# Model parameters
+max_new_tokens: 32768
+use_quantization: false
+temperature: 0.1
+
+# Few-shot learning
+few_shot: 5
+
+# Data files
+train_data_file: "data/train.jsonl"
+
+# Self-RAG specific configuration
+use_description: true
+description_max_tokens: 150
+
+# Logging configuration
+save_logs: true
+log_dir: "experiment_logs/self_rag"
+
+# System message for consistent behavior
+system_message: "You are a factual assistant. Provide only the requested information without explanations, uncertainty statements, or additional context. For name lists, provide only names separated by commas."
