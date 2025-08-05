@@ -242,6 +242,5 @@ This project is licensed under the MIT License. See `LICENSE` file for details.
 ## Contact
 
 - **Jingbo He**: jingbo.he@mailbox.tu-dresden.de
-- **Simon Razniewski**: simon.razniewski@tu-dresden.de
 - **Paper**: [arXiv link will be added]
 - **Competition**: https://lm-kbc.github.io/challenge2025/
