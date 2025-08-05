@@ -110,9 +110,10 @@ python evaluate.py --predictions results/predictions.jsonl --ground_truth data/v
 
 ## Configuration
 
-### Self-RAG Configuration (`configs/self_rag_config.yaml`)
+### Self-RAG Configuration
 
 ```yaml
+# configs/self_rag_config.yaml
 model: "self_rag"
 llm_path: "Qwen/Qwen3-8B"
 prompt_templates_file: "prompt_templates/question_prompts.csv"
@@ -130,9 +131,10 @@ save_logs: true
 log_dir: "experiment_logs"
 ```
 
-### Divide-and-Conquer Configuration (`configs/divide_conquer_config.yaml`)
+### Divide-and-Conquer Configuration
 
 ```yaml
+# configs/divide_conquer_config.yaml
 model: "divide_and_conquer"
 llm_path: "Qwen/Qwen3-8B"
 max_new_tokens: 32768
@@ -193,10 +195,9 @@ LM-KBC-ISWC-2025/
 │   └── test.jsonl
 ├── prompt_templates/           # Prompt templates
 ├── experiment_logs/            # Generated logs and statistics
-├── results/                    # Prediction outputs
+├── outputs/                    # Prediction outputs
 ├── main.py                     # Main execution script
-├── run_hybrid_system.py        # Hybrid system runner
-├── evaluate.py                 # Evaluation utilities
+├── improved_evaluate.py                 # Evaluation utilities
 └── requirements.txt            # Dependencies
 ```
 
