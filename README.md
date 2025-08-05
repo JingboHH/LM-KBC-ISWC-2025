@@ -95,7 +95,7 @@ pip install -r requirements.txt
 
 ```bash
 # Run Self-RAG model on all non-awardWonBy relations
-python baseline.py --config_file configs/self_rag_config.yaml --input_file data/val.jsonl
+python main.py --config_file configs/self_rag_config.yaml --input_file data/val.jsonl
 
 # Run Divide-and-Conquer model for awardWonBy
 python main.py --config_file configs/divide_conquer_config.yaml --input_file data/val.jsonl
