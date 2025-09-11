@@ -10,6 +10,9 @@ max_new_tokens: 32768
 use_quantization: false
 temperature: 0.2
 
+temporal_strategy: "decade"  # "decade" or "year"
+count_tokens: true
+
 # Few-shot learning (disabled to avoid interference)
 few_shot: 0
 
