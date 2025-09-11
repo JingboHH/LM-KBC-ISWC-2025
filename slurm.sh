@@ -5,7 +5,7 @@
 #SBATCH --mem-per-cpu=15G
 #SBATCH --gres=gpu:1
 #SBATCH --time=5:00:00
-#SBATCH --job-name=lm-kbc-test
+#SBATCH --job-name=lm-kbc-newtest
 
 export HF_DATASETS_CACHE="/data/horse/ws/jihe529c-main-rag/cache/hf_datasets"
 export TRANSFORMERS_CACHE="/data/horse/ws/jihe529c-main-rag/cache/hf_models"
@@ -24,7 +24,7 @@ module load PyTorch/2.1.2
 
 source alpha_env/bin/activate
 
-python baseline.py \\
+python main.py \\
   -c configs/divide_and_conquer.yaml \\
   -i data/dac.jsonl \\
   --naming_method combined
