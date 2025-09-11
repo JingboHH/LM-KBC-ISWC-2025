@@ -21,6 +21,10 @@ class DivideConquerModel(Qwen3Model):
         self.use_divide_conquer = config.get("use_divide_conquer", ["awardWonBy"])
         self.max_query_attempts = config.get("max_query_attempts", 3)
         
+        self.temporal_strategy = config.get("temporal_strategy", "decade")
+
+        self.count_tokens = config.get("count_tokens", False)
+        
         # Logging configuration
         self.save_logs = config.get("save_logs", True)
         self.log_dir = Path(config.get("log_dir", "logs"))
@@ -28,8 +32,9 @@ class DivideConquerModel(Qwen3Model):
         
         # Create timestamped log files
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        self.prompt_log_file = self.log_dir / f"divide_conquer_prompts_{timestamp}.jsonl"
-        self.summary_log_file = self.log_dir / f"divide_conquer_summary_{timestamp}.json"
+        strategy_suffix = f"_{self.temporal_strategy}" if self.temporal_strategy else ""
+        self.prompt_log_file = self.log_dir / f"divide_conquer_prompts{strategy_suffix}_{timestamp}.jsonl"
+        self.summary_log_file = self.log_dir / f"divide_conquer_summary{strategy_suffix}_{timestamp}.json"
         
         # Statistics tracking
         self.stats = {
@@ -39,31 +44,60 @@ class DivideConquerModel(Qwen3Model):
             "empty_responses": 0,
             "divide_conquer_used": 0,
             "standard_method_used": 0,
-            "total_sub_queries": 0,  # Number of sub-queries in divide-conquer strategy
+            "total_sub_queries": 0,
+            "total_input_chars": 0,
+            "total_output_chars": 0,
+            "estimated_input_tokens": 0,
+            "estimated_output_tokens": 0,
+            "temporal_strategy": self.temporal_strategy,
             "start_time": datetime.now().isoformat(),
             "relations_stats": {},
             "query_details": {}
         }
         
-        logger.info(f"Divide-and-conquer strategy logs will be saved to: {self.prompt_log_file}")
+        logger.info(f"Using temporal strategy: {self.temporal_strategy}")
+        logger.info(f"Logs will be saved to: {self.prompt_log_file}")
+
+    def estimate_tokens(self, text: str) -> int:
+        return len(text) // 4
     
     def log_interaction(self, entity: str, relation: str, interaction_type: str, 
                        prompt: str, response: str, processed_result: list = None, 
                        error: str = None, metadata: dict = None):
-        """Log detailed information for each interaction."""
+        """Log detailed information for each interaction (增加token统计)."""
         if not self.save_logs:
             return
+        
+        input_chars = len(prompt) if prompt else 0
+        output_chars = len(response) if response else 0
+        
+        if self.count_tokens:
+            input_tokens = self.estimate_tokens(prompt) if prompt else 0
+            output_tokens = self.estimate_tokens(response) if response else 0
+            
+            # 更新统计
+            self.stats["total_input_chars"] += input_chars
+            self.stats["total_output_chars"] += output_chars
+            self.stats["estimated_input_tokens"] += input_tokens
+            self.stats["estimated_output_tokens"] += output_tokens
+        else:
+            input_tokens = 0
+            output_tokens = 0
             
         log_entry = {
             "timestamp": datetime.now().isoformat(),
             "entity": entity,
             "relation": relation,
-            "interaction_type": interaction_type,  # "divide_conquer", "standard", "dimension", "direct"
+            "interaction_type": interaction_type,
             "prompt": prompt,
             "raw_response": response,
             "processed_result": processed_result or [],
             "success": error is None,
             "error": error,
+            "input_chars": input_chars,
+            "output_chars": output_chars,
+            "estimated_input_tokens": input_tokens,
+            "estimated_output_tokens": output_tokens,
             "metadata": metadata or {}
         }
         
@@ -376,6 +410,83 @@ class DivideConquerModel(Qwen3Model):
         response = generated_text[len(chat_prompt):].strip()
         
         return response
+
+    def query_by_temporal_strategy(self, award_name: str) -> set:
+        if self.temporal_strategy == "year":
+            return self.query_by_years(award_name)
+        else:  # default to decade
+            return self.query_by_decades(award_name)
+    
+    def query_by_years(self, award_name: str) -> set:
+        all_recipients = set()
+        start_year = 1950
+        end_year = 2024
+        
+        logger.info(f"Using year-based temporal slicing for {award_name} ({start_year}-{end_year})")
+        
+        for year in tqdm(range(start_year, end_year + 1), desc=f"Querying years for {award_name}"):
+            try:
+                query = f"List all recipients of the {award_name} in {year}. Names only, no explanations. Format: Name1, Name2, Name3"
+                
+                self.stats["total_sub_queries"] += 1
+                
+                response = self.single_query_with_retry(
+                    entity=award_name,
+                    relation="awardWonBy",
+                    prompt=query,
+                    interaction_type="temporal_year",
+                    metadata={
+                        "temporal_type": "year",
+                        "year": year
+                    }
+                )
+                
+                recipients = self.parse_recipients(response)
+                if recipients:
+                    logger.debug(f"  Year {year}: Found {len(recipients)} candidates")
+                    all_recipients.update(recipients)
+                    
+            except Exception as e:
+                logger.warning(f"Error querying year {year}: {e}")
+                continue
+        
+        logger.info(f"Year-based slicing found {len(all_recipients)} total candidates")
+        return all_recipients
+    
+    def query_by_decades(self, award_name: str) -> set:
+        all_recipients = set()
+        temporal_values = ["1950s", "1960s", "1970s", "1980s", "1990s", "2000s", "2010s", "2020s"]
+        
+        logger.info(f"Using decade-based temporal slicing for {award_name}")
+        
+        for decade in temporal_values:
+            try:
+                query = f"List all recipients of the {award_name} in the {decade}. Names only, no years, no explanations. Format: Name1, Name2, Name3"
+                
+                self.stats["total_sub_queries"] += 1
+                
+                response = self.single_query_with_retry(
+                    entity=award_name,
+                    relation="awardWonBy", 
+                    prompt=query,
+                    interaction_type="temporal_decade",
+                    metadata={
+                        "temporal_type": "decade",
+                        "decade": decade
+                    }
+                )
+                
+                recipients = self.parse_recipients(response)
+                if recipients:
+                    logger.debug(f"  Decade {decade}: Found {len(recipients)} candidates")
+                    all_recipients.update(recipients)
+                    
+            except Exception as e:
+                logger.warning(f"Error querying decade {decade}: {e}")
+                continue
+        
+        logger.info(f"Decade-based slicing found {len(all_recipients)} total candidates")
+        return all_recipients
     
     def query_by_dimension(self, award_name: str, dimension: str, values: list) -> set:
         """Query by specific dimension with logging."""
@@ -384,23 +495,14 @@ class DivideConquerModel(Qwen3Model):
         for value in values:
             try:
                 # Construct more precise queries
-                if dimension == "decade":
-                    query = f"List all recipients of the {award_name} in the {value}. Names only, no years, no explanations. Format: Name1, Name2, Name3"
-                elif dimension == "nationality":
+                if dimension == "nationality":
                     if value == "other":
                         query = f"List recipients of the {award_name} from non-Western countries. Names only, no countries. Format: Name1, Name2, Name3"
                     else:
                         query = f"List all {value} recipients of the {award_name}. Names only, no explanations. Format: Name1, Name2, Name3"
-                elif dimension == "field":
-                    query = f"List recipients of the {award_name} for work in {value}. Names only, no descriptions. Format: Name1, Name2, Name3"
-                elif dimension == "recent":
-                    query = f"List recipients of the {award_name} in recent years. Names only, no years. Format: Name1, Name2, Name3"
-                elif dimension == "early":
-                    query = f"List early recipients of the {award_name}. Names only, no years. Format: Name1, Name2, Name3"
                 else:
                     query = f"List recipients of the {award_name} related to {value}. Names only. Format: Name1, Name2, Name3"
                 
-                # Track sub-query statistics
                 self.stats["total_sub_queries"] += 1
                 
                 response = self.single_query_with_retry(
@@ -418,7 +520,7 @@ class DivideConquerModel(Qwen3Model):
                 recipients = self.parse_recipients(response)
                 
                 if recipients:
-                    logger.debug(f"  {dimension}={value}: Found {len(recipients)} valid candidates: {recipients[:3]}...")
+                    logger.debug(f"  {dimension}={value}: Found {len(recipients)} valid candidates")
                     all_recipients.update(recipients)
                 
             except Exception as e:
@@ -428,24 +530,22 @@ class DivideConquerModel(Qwen3Model):
         return all_recipients
     
     def comprehensive_award_query(self, award_name: str) -> list:
-        """Comprehensive divide-and-conquer query strategy with logging."""
-        logger.info(f"Starting enhanced divide-and-conquer query: {award_name}")
+        """Comprehensive divide-and-conquer query strategy."""
+        logger.info(f"Starting divide-and-conquer query: {award_name}")
         
         all_recipients = set()
         
-        # Temporal slicing: decade-based categories
-        temporal_values = ["1950s", "1960s", "1970s", "1980s", "1990s", "2000s", "2010s", "2020s"]
-        temporal_recipients = self.query_by_dimension(award_name, "decade", temporal_values)
+        temporal_recipients = self.query_by_temporal_strategy(award_name)
         all_recipients.update(temporal_recipients)
-        logger.info(f"Temporal slicing found {len(temporal_recipients)} candidates")
         
-        # Geographic slicing: nationality categories
-        geographic_values = ["American", "British", "German", "French", "Italian", "Japanese", "Canadian", "Chinese", "other"]
+        # Geographic slicing
+        geographic_values = ["American", "British", "German", "French", "Italian", 
+                           "Japanese", "Canadian", "Chinese", "other"]
         geographic_recipients = self.query_by_dimension(award_name, "nationality", geographic_values)
         all_recipients.update(geographic_recipients)
         logger.info(f"Geographic slicing found {len(geographic_recipients)} candidates")
         
-        # Direct enumeration: backup strategies
+        # Direct enumeration
         direct_queries = self.create_specific_queries(award_name)
         for i, query in enumerate(direct_queries):
             try:
@@ -553,15 +653,29 @@ class DivideConquerModel(Qwen3Model):
             self.stats["success_rate"] = self.stats["successful_queries"] / self.stats["total_entities"]
             self.stats["empty_rate"] = self.stats["empty_responses"] / self.stats["total_entities"]
         
+        # Token统计
+        if self.count_tokens:
+            self.stats["total_estimated_tokens"] = (
+                self.stats["estimated_input_tokens"] + 
+                self.stats["estimated_output_tokens"]
+            )
+            self.stats["avg_tokens_per_query"] = (
+                self.stats["total_estimated_tokens"] / self.stats["total_sub_queries"]
+                if self.stats["total_sub_queries"] > 0 else 0
+            )
+        
         # Save summary
         with open(self.summary_log_file, "w", encoding="utf-8") as f:
             json.dump(self.stats, f, indent=2, ensure_ascii=False)
         
         logger.info(f"Execution summary saved to: {self.summary_log_file}")
-        logger.info(f"Success rate: {self.stats.get('success_rate', 0):.2%}")
-        logger.info(f"Empty response rate: {self.stats.get('empty_rate', 0):.2%}")
-        logger.info(f"Divide-conquer usage: {self.stats['divide_conquer_used']} / {self.stats['total_entities']}")
+        logger.info(f"Temporal strategy used: {self.temporal_strategy}")
         logger.info(f"Total sub-queries executed: {self.stats['total_sub_queries']}")
+        
+        if self.count_tokens:
+            logger.info(f"Estimated total tokens: {self.stats['total_estimated_tokens']:,}")
+            logger.info(f"Average tokens per query: {self.stats['avg_tokens_per_query']:.0f}")
+        
 
 # Configuration utilities
 def create_divide_conquer_config():
