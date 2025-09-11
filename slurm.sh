@@ -25,6 +25,6 @@ module load PyTorch/2.1.2
 source alpha_env/bin/activate
 
 python main.py \
-  -c configs/divide_and_conquer.yaml \
+  -c configs/divide_and_conquer_year.yaml \
   -i data/dac.jsonl \
   --naming_method combined
