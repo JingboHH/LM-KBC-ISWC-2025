@@ -1,0 +1,147 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+
+# Virtual Environments
+venv/
+ENV/
+env/
+.venv
+.conda/
+*.conda
+
+# Jupyter Notebooks
+.ipynb_checkpoints
+*.ipynb
+
+# Model files and checkpoints
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.bin
+models/pretrained/
+models/checkpoints/
+Qwen*/
+huggingface_cache/
+.cache/
+
+# Data files
+data/*.jsonl
+data/*.json
+data/*.csv
+!data/train.jsonl  # Keep the original training file
+!data/dev.jsonl    # Keep the original dev file
+data/processed/
+data/raw/
+data/temp/
+
+# Experiment logs and outputs
+experiment_logs/
+logs/
+divide_conquer_logs/
+temporal_comparison_logs/
+outputs/
+results/
+predictions/
+submissions/
+*.log
+
+# Hydra outputs
+outputs/
+multirun/
+.hydra/
+
+# Configuration overrides (local)
+configs/local/
+*.local.yaml
+
+# Analysis and statistics
+analysis_outputs/
+statistics/
+comparison_results/
+*.tex  # LaTeX tables
+tables/
+
+# IDE and editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.project
+.pydevproject
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+.directory
+
+# Documentation builds
+docs/_build/
+docs/_static/
+docs/_templates/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+*.bak
+*.backup
+*.old
+
+# API keys and secrets
+.env
+.env.local
+*.key
+secrets/
+credentials/
+
+# Large files
+*.tar.gz
+*.zip
+*.tar
+*.gz
+
+# Specific project patterns
+prompt_templates/*.csv.bak
+leaderboard_submissions/
+codalab_submissions/
+
+# Keep important structure files
+!.gitkeep
+!requirements.txt
+!setup.py
+!README.md
