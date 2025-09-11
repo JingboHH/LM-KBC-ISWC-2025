@@ -7,10 +7,10 @@
 #SBATCH --time=5:00:00
 #SBATCH --job-name=lm-kbc-newtest
 
-export HF_DATASETS_CACHE="/data/horse/ws/jihe529c-main-rag/cache/hf_datasets"
-export TRANSFORMERS_CACHE="/data/horse/ws/jihe529c-main-rag/cache/hf_models"
-export HF_HOME="/data/horse/ws/jihe529c-main-rag/cache/huggingface"
-export TORCH_HOME="/data/horse/ws/jihe529c-main-rag/cache/torch"
+export HF_DATASETS_CACHE="/data/horse/ws/jihe529c-lm-kbc/cache/hf_datasets"
+export TRANSFORMERS_CACHE="/data/horse/ws/jihe529c-lm-kbc/cache/hf_models"
+export HF_HOME="/data/horse/ws/jihe529c-lm-kbc/cache/huggingface"
+export TORCH_HOME="/data/horse/ws/jihe529c-lm-kbc/cache/torch"
 export HF_DATASETS_TRUST_REMOTE_CODE=1
 
 mkdir -p $HF_DATASETS_CACHE
