@@ -1,7 +1,7 @@
 # configs/divide_conquer_config.yaml
 # Configuration for Divide-and-Conquer model (awardWonBy relation)
 
-model: "divide_and_conquer"
+model: "divide_conquer"
 llm_path: "Qwen/Qwen3-8B"
 prompt_templates_file: "prompt_templates/question_prompts.csv"
 
