@@ -39,6 +39,7 @@ env/
 # Jupyter Notebooks
 .ipynb_checkpoints
 *.ipynb
+*.sh
 
 # Model files and checkpoints
 *.pt
