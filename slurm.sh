@@ -4,7 +4,7 @@
 #SBATCH --cpus-per-task=6
 #SBATCH --mem-per-cpu=15G
 #SBATCH --gres=gpu:1
-#SBATCH --time=5:00:00
+#SBATCH --time=12:00:00
 #SBATCH --job-name=lm-kbc-newtest
 
 export HF_DATASETS_CACHE="/data/horse/ws/jihe529c-lm-kbc/cache/hf_datasets"
@@ -26,5 +26,5 @@ source alpha_env/bin/activate
 
 python main.py \
   -c configs/self_rag.yaml \
-  -i data/self_rag.jsonl \
+  -i data/dac.jsonl \
   --naming_method combined
