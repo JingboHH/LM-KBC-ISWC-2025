@@ -9,11 +9,7 @@ import os
 
 class SelfRAGModel(Qwen3Model):
     """
-    Self-RAG strategy implementation with comprehensive logging.
-    
-    This model implements a two-stage approach:
-    1. Generate entity descriptions to activate relevant knowledge
-    2. Use descriptions to guide targeted extraction
+    Self-RAG strategy implementation with comprehensive logging and token counting.
     """
     
     def __init__(self, config):
@@ -22,6 +18,9 @@ class SelfRAGModel(Qwen3Model):
         self.use_description = config.get("use_description", True)
         self.description_max_tokens = config.get("description_max_tokens", 1000)
         
+        # Token counting configuration
+        self.count_tokens = config.get("count_tokens", False)
+        
         # Logging configuration
         self.save_logs = config.get("save_logs", True)
         self.log_dir = Path(config.get("log_dir", "logs"))
@@ -29,38 +28,78 @@ class SelfRAGModel(Qwen3Model):
         
         # Create timestamped log files
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        self.prompt_log_file = self.log_dir / f"prompts_responses_{timestamp}.jsonl"
-        self.summary_log_file = self.log_dir / f"summary_{timestamp}.json"
+        self.prompt_log_file = self.log_dir / f"selfrag_prompts_{timestamp}.jsonl"
+        self.summary_log_file = self.log_dir / f"selfrag_summary_{timestamp}.json"
         
-        # Statistics tracking
+        # Statistics tracking with token counts
         self.stats = {
             "total_queries": 0,
             "successful_queries": 0,
             "failed_queries": 0,
             "empty_responses": 0,
+            "total_descriptions": 0,
+            "total_input_chars": 0,
+            "total_output_chars": 0,
+            "estimated_input_tokens": 0,
+            "estimated_output_tokens": 0,
+            "description_tokens": 0,
+            "query_tokens": 0,
             "start_time": datetime.now().isoformat(),
             "relations_stats": {}
         }
         
-        logger.info(f"Logs will be saved to: {self.prompt_log_file}")
+        logger.info(f"SelfRAG logs will be saved to: {self.prompt_log_file}")
+        if self.count_tokens:
+            logger.info("Token counting enabled")
+    
+    def estimate_tokens(self, text: str) -> int:
+        """Estimate tokens: approximately 4 characters per token for English text."""
+        return len(text) // 4 if text else 0
     
     def log_interaction(self, entity: str, relation: str, interaction_type: str, 
                        prompt: str, response: str, processed_result: list = None, 
                        error: str = None, metadata: dict = None):
-        """Log detailed information for each interaction."""
+        """Log detailed information with token counting."""
         if not self.save_logs:
             return
+        
+        # Calculate character and token counts
+        input_chars = len(prompt) if prompt else 0
+        output_chars = len(response) if response else 0
+        
+        if self.count_tokens:
+            input_tokens = self.estimate_tokens(prompt)
+            output_tokens = self.estimate_tokens(response)
+            
+            # Update global statistics
+            self.stats["total_input_chars"] += input_chars
+            self.stats["total_output_chars"] += output_chars
+            self.stats["estimated_input_tokens"] += input_tokens
+            self.stats["estimated_output_tokens"] += output_tokens
+            
+            # Track tokens by interaction type
+            if interaction_type == "description":
+                self.stats["description_tokens"] += input_tokens + output_tokens
+            elif interaction_type == "query":
+                self.stats["query_tokens"] += input_tokens + output_tokens
+        else:
+            input_tokens = 0
+            output_tokens = 0
             
         log_entry = {
             "timestamp": datetime.now().isoformat(),
             "entity": entity,
             "relation": relation,
-            "interaction_type": interaction_type,  # "description" or "query"
+            "interaction_type": interaction_type,
             "prompt": prompt,
             "raw_response": response,
             "processed_result": processed_result or [],
             "success": error is None,
             "error": error,
+            "input_chars": input_chars,
+            "output_chars": output_chars,
+            "estimated_input_tokens": input_tokens,
+            "estimated_output_tokens": output_tokens,
             "metadata": metadata or {}
         }
         
@@ -68,36 +107,39 @@ class SelfRAGModel(Qwen3Model):
         with open(self.prompt_log_file, "a", encoding="utf-8") as f:
             f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
     
-    def update_stats(self, relation: str, success: bool, empty_result: bool = False):
+    def update_stats(self, relation: str, success: bool, empty_result: bool = False, 
+                    is_description: bool = False):
         """Update running statistics."""
-        self.stats["total_queries"] += 1
-        if success:
-            self.stats["successful_queries"] += 1
+        if is_description:
+            self.stats["total_descriptions"] += 1
         else:
-            self.stats["failed_queries"] += 1
-            
-        if empty_result:
-            self.stats["empty_responses"] += 1
-            
+            self.stats["total_queries"] += 1
+            if success:
+                self.stats["successful_queries"] += 1
+            else:
+                self.stats["failed_queries"] += 1
+                
+            if empty_result:
+                self.stats["empty_responses"] += 1
+        
         # Per-relation statistics
         if relation not in self.stats["relations_stats"]:
             self.stats["relations_stats"][relation] = {
-                "total": 0, "success": 0, "failed": 0, "empty": 0
+                "total": 0, "success": 0, "failed": 0, "empty": 0,
+                "description_tokens": 0, "query_tokens": 0
             }
         
-        self.stats["relations_stats"][relation]["total"] += 1
-        if success:
-            self.stats["relations_stats"][relation]["success"] += 1
-        else:
-            self.stats["relations_stats"][relation]["failed"] += 1
-        if empty_result:
-            self.stats["relations_stats"][relation]["empty"] += 1
+        if not is_description:
+            self.stats["relations_stats"][relation]["total"] += 1
+            if success:
+                self.stats["relations_stats"][relation]["success"] += 1
+            else:
+                self.stats["relations_stats"][relation]["failed"] += 1
+            if empty_result:
+                self.stats["relations_stats"][relation]["empty"] += 1
     
     def generate_entity_description(self, entity_name: str, relation: str) -> str:
-        """
-        Stage 1: Generate entity description with logging.
-        Creates relation-specific descriptions to activate relevant knowledge.
-        """
+        """Stage 1: Generate entity description with token counting."""
         description_prompts = {
             "hasArea": f"Describe {entity_name} with emphasis on its total area, size measurements, and spatial dimensions in square kilometers.",
             "hasCapacity": f"Describe {entity_name} focusing on its maximum capacity, volume, or the number of people/items it can hold or accommodate.", 
@@ -109,7 +151,6 @@ class SelfRAGModel(Qwen3Model):
         
         user_prompt = description_prompts.get(relation, f"Describe {entity_name} in detail.")
         
-        # Generate description
         messages = [
             {"role": "system", "content": "Provide a detailed, factual description."},
             {"role": "user", "content": user_prompt}
@@ -123,7 +164,7 @@ class SelfRAGModel(Qwen3Model):
             output = self.pipe(chat_prompt, max_new_tokens=self.description_max_tokens, temperature=0.1)
             description = output[0]["generated_text"][len(chat_prompt):].strip()
             
-            # Log description generation
+            # Log description generation with token counts
             self.log_interaction(
                 entity=entity_name,
                 relation=relation,
@@ -135,6 +176,9 @@ class SelfRAGModel(Qwen3Model):
                     "temperature": 0.1
                 }
             )
+            
+            # Update description count
+            self.update_stats(relation, success=True, is_description=True)
             
             return description
             
@@ -149,6 +193,7 @@ class SelfRAGModel(Qwen3Model):
                 error=error_msg
             )
             logger.error(f"Description generation failed for {entity_name}: {e}")
+            self.update_stats(relation, success=False, is_description=True)
             return f"Basic information about {entity_name}."
     
     def create_prompt_with_description(self, subject_entity: str, relation: str, description: str) -> str:
@@ -329,7 +374,7 @@ class SelfRAGModel(Qwen3Model):
         return results
     
     def save_final_summary(self):
-        """Save final execution statistics summary."""
+        """Save final execution statistics with token counts."""
         if not self.save_logs:
             return
             
@@ -344,6 +389,32 @@ class SelfRAGModel(Qwen3Model):
             self.stats["success_rate"] = self.stats["successful_queries"] / self.stats["total_queries"]
             self.stats["empty_rate"] = self.stats["empty_responses"] / self.stats["total_queries"]
         
+        # Token statistics
+        if self.count_tokens:
+            self.stats["total_estimated_tokens"] = (
+                self.stats["estimated_input_tokens"] + 
+                self.stats["estimated_output_tokens"]
+            )
+            
+            # Average tokens per interaction
+            total_interactions = self.stats["total_queries"] + self.stats["total_descriptions"]
+            if total_interactions > 0:
+                self.stats["avg_tokens_per_interaction"] = (
+                    self.stats["total_estimated_tokens"] / total_interactions
+                )
+            
+            # Token breakdown
+            self.stats["token_breakdown"] = {
+                "description_percentage": (
+                    self.stats["description_tokens"] / self.stats["total_estimated_tokens"] * 100
+                    if self.stats["total_estimated_tokens"] > 0 else 0
+                ),
+                "query_percentage": (
+                    self.stats["query_tokens"] / self.stats["total_estimated_tokens"] * 100
+                    if self.stats["total_estimated_tokens"] > 0 else 0
+                )
+            }
+        
         # Save summary
         with open(self.summary_log_file, "w", encoding="utf-8") as f:
             json.dump(self.stats, f, indent=2, ensure_ascii=False)
@@ -351,6 +422,11 @@ class SelfRAGModel(Qwen3Model):
         logger.info(f"Execution summary saved to: {self.summary_log_file}")
         logger.info(f"Success rate: {self.stats.get('success_rate', 0):.2%}")
         logger.info(f"Empty response rate: {self.stats.get('empty_rate', 0):.2%}")
+        
+        if self.count_tokens:
+            logger.info(f"Total estimated tokens: {self.stats['total_estimated_tokens']:,}")
+            logger.info(f"Description tokens: {self.stats['description_tokens']:,} ({self.stats['token_breakdown']['description_percentage']:.1f}%)")
+            logger.info(f"Query tokens: {self.stats['query_tokens']:,} ({self.stats['token_breakdown']['query_percentage']:.1f}%)")
 
 # Configuration utilities
 def create_enhanced_config():
