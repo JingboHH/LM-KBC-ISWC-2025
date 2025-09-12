@@ -25,6 +25,6 @@ module load PyTorch/2.1.2
 source alpha_env/bin/activate
 
 python main.py \
-  -c configs/self_rag.yaml \
-  -i data/dac.jsonl \
+  -c configs//divide_and_conquer_multi.yaml \
+  -i data/dac_multi.jsonl \
   --naming_method combined
