@@ -18,7 +18,7 @@ class DivideConquerModel(Qwen3Model):
     
     def __init__(self, config):
         super().__init__(config)
-        self.use_divide_conquer = config.get("use_divide_conquer", ["awardWonBy"])
+        self.use_divide_conquer = config.get("use_divide_conquer", ["awardWonBy", "countryLandBordersCountry", "companyTradesAtStockExchange"])
         self.max_query_attempts = config.get("max_query_attempts", 3)
         
         self.temporal_strategy = config.get("temporal_strategy", "decade")
@@ -321,7 +321,35 @@ class DivideConquerModel(Qwen3Model):
                 unique_recipients.append(name)
         
         return unique_recipients
+
+    def parse_entities(self, response: str, entity_type: str = "name") -> list[str]:
+        """Parse different entity types from response"""
+        if not response or response.lower() in ['none', 'null', '']:
+            return []
+        
+        if entity_type in ["country", "exchange"]:
+            return self.parse_general_entities(response)
+        else:
+            return self.parse_recipients(response)
     
+    def parse_general_entities(self, response: str) -> list[str]:
+        """Parse general entities (countries, exchanges) with relaxed validation"""
+        entities = []
+        parts = response.split(',')
+        
+        for part in parts:
+            clean_part = part.strip()
+            clean_part = re.sub(r'^\d+[\.\)]\s*', '', clean_part)
+            clean_part = re.sub(r'^[-•*◦]\s*', '', clean_part).strip()
+            
+            if (clean_part and 
+                len(clean_part) > 1 and 
+                len(clean_part) < 100 and
+                not re.search(r'\b(is|are|was|were|have|has)\b', clean_part.lower())):
+                entities.append(clean_part)
+        
+        return list(set(entities))
+
     def create_specific_queries(self, award_name: str) -> list[str]:
         """Create more specific queries to get pure name lists."""
         return [
@@ -528,6 +556,58 @@ class DivideConquerModel(Qwen3Model):
                 continue
         
         return all_recipients
+
+    def comprehensive_query_by_relation(self, entity: str, relation: str) -> list:
+        
+        if relation == "awardWonBy":
+            return self.comprehensive_award_query(entity)
+        
+        elif relation == "countryLandBordersCountry":
+            return self.query_country_borders(entity)
+        
+        elif relation == "companyTradesAtStockExchange":
+            return self.query_stock_exchanges(entity)
+        
+        else:
+            return self.standard_query(entity, relation)
+
+    def query_country_borders(self, country_name: str) -> list:
+        all_borders = set()
+        
+        directions = ["north", "south", "east", "west", "northeast", "northwest", "southeast", "southwest"]
+        for direction in directions:
+            query = f"Which countries border {country_name} to the {direction}? Names only."
+            response = self.single_query_with_retry(country_name, "countryLandBordersCountry", 
+                                                   query, f"direction_{direction}")
+            borders = self.parse_entities(response, entity_type="country")
+            all_borders.update(borders)
+        
+        query = f"List all neighboring countries of {country_name}. Names only."
+        response = self.single_query_with_retry(country_name, "countryLandBordersCountry", 
+                                               query, "all_neighbors")
+        borders = self.parse_recipients(response)
+        all_borders.update(borders)
+        
+        return list(all_borders)
+    
+    def query_stock_exchanges(self, company_name: str) -> list:
+        all_exchanges = set()
+        
+        regions = ["American", "European", "Asian", "other international"]
+        for region in regions:
+            query = f"On which {region} stock exchanges does {company_name} trade? Names only."
+            response = self.single_query_with_retry(company_name, "companyTradesAtStockExchange",
+                                                   query, f"region_{region}")
+            exchanges = self.parse_entities(response, entity_type="exchange")
+            all_exchanges.update(exchanges)
+        
+        query = f"List all stock exchanges where {company_name} is listed. Names only."
+        response = self.single_query_with_retry(company_name, "companyTradesAtStockExchange",
+                                               query, "all_exchanges")
+        exchanges = self.parse_recipients(response)
+        all_exchanges.update(exchanges)
+        
+        return list(all_exchanges)
     
     def comprehensive_award_query(self, award_name: str) -> list:
         """Comprehensive divide-and-conquer query strategy."""
@@ -589,12 +669,10 @@ class DivideConquerModel(Qwen3Model):
             
             try:
                 if relation in self.use_divide_conquer:
-                    # Use divide-and-conquer strategy
                     logger.info(f"Applying divide-and-conquer to {entity} ({relation})")
-                    object_entities = self.comprehensive_award_query(entity)
+                    object_entities = self.comprehensive_query_by_relation(entity, relation)
                     method_used = "divide_conquer"
                 else:
-                    # Use standard method
                     object_entities = self.standard_query(entity, relation)
                     method_used = "standard"
                 
@@ -653,7 +731,6 @@ class DivideConquerModel(Qwen3Model):
             self.stats["success_rate"] = self.stats["successful_queries"] / self.stats["total_entities"]
             self.stats["empty_rate"] = self.stats["empty_responses"] / self.stats["total_entities"]
         
-        # Token统计
         if self.count_tokens:
             self.stats["total_estimated_tokens"] = (
                 self.stats["estimated_input_tokens"] + 
@@ -676,6 +753,12 @@ class DivideConquerModel(Qwen3Model):
             logger.info(f"Estimated total tokens: {self.stats['total_estimated_tokens']:,}")
             logger.info(f"Average tokens per query: {self.stats['avg_tokens_per_query']:.0f}")
         
+def analyze_dc_performance_by_relation(self):
+    for relation, stats in self.stats["relations_stats"].items():
+        if stats["divide_conquer"] > 0:
+            logger.info(f"\n{relation} D&C Performance:")
+            logger.info(f"  - Sub-queries: {self.stats['total_sub_queries'] // stats['divide_conquer']}")
+            logger.info(f"  - Success rate: {stats['success']/stats['total']:.2%}")
 
 # Configuration utilities
 def create_divide_conquer_config():
