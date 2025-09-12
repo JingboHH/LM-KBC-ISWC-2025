@@ -19,6 +19,7 @@ train_data_file: "data/train.jsonl"
 # Self-RAG specific configuration
 use_description: true
 description_max_tokens: 150
+count_tokens: true
 
 # Logging configuration
 save_logs: true
