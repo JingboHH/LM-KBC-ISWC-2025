@@ -28,6 +28,8 @@ htmlcov/
 .nox/
 .hypothesis/
 
+output/
+
 # Virtual Environments
 venv/
 ENV/
